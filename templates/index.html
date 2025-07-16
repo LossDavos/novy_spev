@@ -1,0 +1,75 @@
+{% extends "layout.html" %}
+{% block content %}
+<a href="{{ url_for('backup') }}" class="btn btn-primary">Zálohuj Database</a>
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="alert alert-success mt-3">
+      {{ messages[0] }}
+    </div>
+  {% endif %}
+{% endwith %}
+<a href="{{ url_for('load_songs') }}" class="btn btn-primary mb-3">Načítaj z JSON (nestláčať)</a>
+
+<a href="{{ url_for('add_song') }}" class="btn btn-primary mb-3">+ Pridaj novú pieseň</a>
+
+<table class="table table-bordered">
+    <thead>
+        <tr><th>ID</th><th>Title</th><th>Názov Verzie</th><th>Author</th><th>Skontrolované adminom</th><th>Skontrolované</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+        {% for song in songs %}
+        <tr id="song-{{ song.id }}">
+          <td>{{ song.song_id }}</td>
+            <td>{{ song.title }}</td>
+            <td>{{ song.version_name }}</td>
+            <td>{{ song.author }}</td>
+            <td>{{ '✅' if song.admin_checked else '❌' }}</td>
+            <td>{{ '✅' if song.checked else '❌' }}</td>
+
+            <td id="song-{{ song.id }}">
+                <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+                  <a href="{{ url_for('song_detail', song_id=song.id) }}" class="btn btn-sm btn-info">Upraviť</a>
+                  <form method="POST" action="{{ url_for('generate_tex', song_id=song.id) }}#song-{{ song.id }}" class="d-inline">
+                      <button type="submit" class="btn btn-sm btn-warning {% if song.admin_checked %}disabled{% endif %}">Vygeneruj TeX</button>
+                  </form>
+                  
+                  <form method="GET" action="{{ url_for('generate_pdfs', song_id=song.id) }}#song-{{ song.id }}" class="d-inline">
+                      <button type="submit" 
+                              class="btn btn-sm btn-primary" 
+                              {% if not song.tex_path or song.admin_checked %}disabled
+                              data-bs-toggle="tooltip" 
+                              title="First generate TeX files"{% endif %}>
+                          Vygeneruj PDFs
+                      </button>
+                  </form>
+              </div>
+              </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<script>
+
+  window.onload = function () {
+  const hash = window.location.hash;
+  if (hash) {
+    const row = document.querySelector(hash);
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      row.querySelectorAll('td').forEach(cell => {
+        // inline style to override bootstrap!
+        cell.style.backgroundColor = '#fff3cd';
+        setTimeout(() => {
+          cell.style.backgroundColor = '';
+        }, 2000);
+      });
+    }
+  }
+};
+</script>
+
+
+{% endblock %}

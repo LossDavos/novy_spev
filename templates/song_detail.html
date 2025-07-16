@@ -1,0 +1,682 @@
+{% extends "layout.html" %}
+{% block content %}
+{% set part_types = ["verse", "chorus", "bridge", "intro", "interlude", "coda", "outro", "pre-chorus"] %}
+ {% set options = [
+      "stále omšové spevy",
+      "úvod",
+      "medzispevy (žalmy; aleluja)",
+      "obetovanie",
+      "prijímanie",
+      "poďakovanie po prijímaní",
+      "záver",
+      "adorácia",
+      "advent",
+      "vianoce",
+      "pôst",
+      "veľká noc",
+      "cez rok",
+      "k Duchu Svätému",
+      "mariánske",
+      "k svätcom",
+      "detské",
+      "iné",
+      "liturgia hodín",
+      "sobášne",
+      "krížová cesta"
+    ] %}
+
+<form method="post" enctype="multipart/form-data">
+    <div class="mb-3">
+       <div class="song-container d-flex align-items-start gap-2 mb-3">
+          <span class="fw-bold mt-2 clickable-song-id" 
+                data-bs-toggle="modal" 
+                data-bs-target="#associateSongModal"
+                data-song-id="{{ song.song_id }}"
+                style="cursor: pointer; text-decoration: underline dotted;">
+            {{ song.song_id }}
+          </span>
+          <div class="flex-grow-1">
+            <input class="form-control mb-1" name="title" value="{{ song.title }}", placeholder="Názov piesne">
+            <input class="form-control form-control-sm" name="version_name" value="{{ song.version_name if song.version_name }}" placeholder="Názov verzie (ak má pieseň viac verzií)">
+          </div>
+        </div>
+    </div>
+    <div class="mb-3">
+        <label>Názov (Originálny čiže anglický, taliansky...)</label>
+        <input class="form-control" name="title_original" value="{{ song.title_original if song.title_origina }}">
+    </div>
+    <!-- Alternative titles section -->
+  <div class="mb-3" id="alt-titles-container">
+    <label>Alternatívne názvy pod ktorými pieseň poznáš</label>
+    <div id="alt-titles-list">
+      {% if song.alternative_titles %}
+        {% for alt_title in song.alternative_titles %}
+          <div class="alt-title-entry">
+            <input type="text" name="alternative_titles" value="{{ alt_title }}" class="form-control mb-2" />
+            <button type="button" class="remove-alt-title btn btn-danger btn-sm">Vymaž</button>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="alt-title-entry">
+          <input type="text" name="alternative_titles" class="form-control mb-2" placeholder="Enter alternative title" />
+          <button type="button" class="remove-alt-title btn btn-danger btn-sm">Vymaž</button>
+        </div>
+      {% endif %}
+    </div>
+    <button type="button" id="add-alt-title" class="btn btn-primary btn-sm">+ Pridaj iný názov</button>
+  </div>
+    <div class="mb-3">
+      <label>Autor (Tejto verzie, slovenskej)</label>
+      <input class="form-control" name="author" 
+            value="{{ song.author if song.author }}">
+    </div>
+    </div>
+    <div class="mb-3">
+        <label>Autor originálnej verzie</label>
+        <input class="form-control" name="author_original" value="{{ song.author_original if song.author_original }}">
+    </div>
+    
+    <div class="mb-3">
+  <label>Kategórie</label>
+  <div id="categories-buttons" style="display: flex; flex-wrap: wrap; gap: 6px;">
+   
+    {% for option in options %}
+      <button type="button" class="category-btn {% if option in (song.categories or []) %}selected{% endif %}" data-value="{{ option }}">
+        {{ option }}
+      </button>
+    {% endfor %}
+  </div>
+  <!-- Hidden input to store selected values -->
+  <input type="hidden" name="categories" id="categories-input" value="{{ song.categories if song.categories }}">
+</div>
+
+
+<!-- === FILE MANAGEMENT SECTION === -->
+<div class="card p-3 mb-4 border shadow-sm rounded">
+  <h4 class="mb-3">🎵 Súbory Uploads & Downloads</h4>
+
+  <!-- === TeX File === -->
+  <div class="mb-4">
+    <h5>TeX Súbor (Nerieš)</h5>
+    {% if song.tex_path %}
+      <div>
+        <a href="{{ url_for('static', filename='uploads/' + song.id|string + '/' + song.tex_path.split('/')[-1]) }}" target="_blank">
+          Stianhni TeX File
+        </a>
+        <button type="button" class="ms-2 btn btn-sm btn-danger" onclick="confirmDelete('tex')">Vymaž</button>
+      </div>
+    {% else %}
+      <label class="form-label">Nahraj TeX File</label>
+      <input type="file" name="tex" class="form-control">
+    {% endif %}
+  </div>
+
+  <!-- === PDF Files === -->
+   {% if song.tex_path and not song.pdf_lyrics_path %}
+  <a href="{{ url_for('generate_pdfs', song_id=song.id) }}#song-{{ song.id }}" 
+     class="btn btn-sm btn-primary mb-1">
+    Vygeneruj PDFs (na základe TeX súboru)
+  </a>
+{% endif %}
+  <div class="mb-4">
+    <!-- Lyrics PDF -->
+    <div class="mb-2">
+      <h5>PDF (Lyrics)</h5>
+      {% if song.pdf_lyrics_path %}
+        <a href="{{ url_for('static', filename='uploads/' + song.id|string + '/' + song.pdf_lyrics_path.split('/')[-1]) }}" target="_blank">
+          Stiahni Lyrics PDF (Slová bez akordov)
+        </a>
+        <button type="button" class="ms-2 btn btn-sm btn-danger" onclick="confirmDelete('pdf_lyrics')">Vymaž</button>
+      {% else %}
+        <label class="form-label">Nahraj PDF (Lyrics)</label>
+        <input type="file" name="pdf_lyrics" class="form-control">
+      {% endif %}
+    </div>
+
+    <!-- Lyrics + Chords PDF -->
+    <div class="mb-2">
+      <h5>PDF (Chords)</h5>
+      {% if song.pdf_chords_path %}
+        <a href="{{ url_for('static', filename='uploads/' + song.id|string + '/' + song.pdf_chords_path.split('/')[-1]) }}" target="_blank">
+          Stiahni Lyrics + Chords PDF (Slová a akordy)
+        </a>
+        <button type="button" class="ms-2 btn btn-sm btn-danger" onclick="confirmDelete('pdf_chords')">Vymaž</button>
+      {% else %}
+        <label class="form-label">Nahraj PDF (Lyrics + Chords - Slová s akordami)</label>
+        <input type="file" name="pdf_chords" class="form-control">
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- === MP3 Files === -->
+  <div class="mb-4">
+    <h5>MP3 Súbory</h5>
+    <label class="form-label">Nahraj MP3(s)</label>
+    <input type="file" name="mp3s" class="form-control mb-2" multiple>
+
+    {% for path in mp3s %}
+      <div class="d-flex align-items-center mb-1">
+        <a href="{{ url_for('static', filename='uploads/' + song.id|string + '/' + path.split('/')[-1]) }}" target="_blank">
+          {{ path.split('/')[-1] }}
+        </a>
+        <button type="button" class="ms-2 btn btn-sm btn-danger" onclick="confirmDelete('mp3', '{{ path }}')">Vymaž</button>
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- === MIDI Files === -->
+  <div class="mb-4">
+    <h5>MIDI Súbory</h5>
+    <label class="form-label">Nahraj MIDI(s)</label>
+    <input type="file" name="midis" class="form-control mb-2" multiple>
+
+    {% for path in midis %}
+      <div class="d-flex align-items-center mb-1">
+        <a href="{{ url_for('static', filename='uploads/' + song.id|string + '/' + path.split('/')[-1]) }}" target="_blank">
+          {{ path.split('/')[-1] }}
+        </a>
+        <button type="button" class="ms-2 btn btn-sm btn-danger" onclick="confirmDelete('midi', '{{ path }}')">Vymaž</button>
+      </div>
+    {% endfor %}
+  </div>
+
+<!-- === Sheet PDF Files === -->
+  <div class="mb-4">
+    <h5>Noty (PDF Files)</h5>
+    <label class="form-label">Nahraj Sheet(s)</label>
+    <input type="file" name="sheet_pdfs" class="form-control mb-2" multiple>
+
+    {% for path in sheet_pdfs %}
+      <div class="d-flex align-items-center mb-1">
+        <a href="{{ url_for('static', filename='uploads/' + song.id|string + '/' + path.split('/')[-1]) }}" target="_blank">
+          {{ path.split('/')[-1] }}
+        </a>
+        <button type="button" class="ms-2 btn btn-sm btn-danger" onclick="confirmDelete('sheet_pdfs', '{{ path }}')">Vymaž</button>
+      </div>
+    {% endfor %}
+  </div>
+
+<!-- === Sheet MSCZ Files === -->
+    <div class="mb-4">
+    <h5>Noty (MSCZ Files)</h5>
+    <label class="form-label">Nahraj MSCZ(s)</label>
+    <input type="file" name="sheet_mscz" class="form-control mb-2" multiple>
+
+    {% for path in sheet_mscz%}
+      <div class="d-flex align-items-center mb-1">
+        <a href="{{ url_for('static', filename='uploads/' + song.id|string + '/' + path.split('/')[-1]) }}" target="_blank">
+          {{ path.split('/')[-1] }}
+        </a>
+        <button type="button" class="ms-2 btn btn-sm btn-danger" onclick="confirmDelete('sheet_mscz', '{{ path }}')">Vymaž</button>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+</div>
+</div>
+
+
+<h4>Uprav časti piesne</h4>
+  <div id="parts-container">
+
+    {% for part in data %}
+<div class="card p-3 mb-3 part-card part-{{ part.type | lower | replace(' ', '-') }}" data-part-index="{{ loop.index0 }}">
+        <div class="mb-2">
+          <label>Typ časti</label>
+<select class="form-select part-type-select" name="part_type_{{ loop.index0 }}" data-part-index="{{ loop.index0 }}">
+            {% for pt in part_types %}
+              <option value="{{ pt }}" {% if part.type == pt %}selected{% endif %}>{{ pt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="button" class="btn btn-danger btn-sm delete-part" style="margin-top: 24px;">Vymaž</button>
+
+        <div class="mb-2">
+          <label>Text (chords and lyrics)</label>
+          <textarea class="form-control" name="part_lines_{{ loop.index0 }}" rows="5">{% for line in part.lines %}{{ line }}
+{% endfor %}</textarea>
+        </div>
+        <div class="text-muted">Náhľad:</div>
+        <div class="rendered-block bg-light p-2 border">
+          {% for line in part.lines %}
+            <div>{{ line | replace_chords | safe }}</div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+      <button type="button" id="add-part" class="btn btn-outline-secondary mb-4">+ Pridaj časť</button>
+    </div>
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="checked" {% if song.checked %}checked{% endif %}>
+        <label class="form-check-label "><strong>Označ ako Skontrolované</strong></label>
+    </div>
+
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="admin_checked" {% if song.admin_checked %}checked{% endif %}>
+        <label class="form-check-label text-secondary">(NEKLIKAJ) Označ ako finálne skontrolované adminom </label>
+    </div>
+
+    <button type="submit" class="btn btn-success mt-3">Ulož</button>
+</form>
+
+<!-- Modal Popup -->
+<div class="modal fade" id="associateSongModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Spoj s existujúcou piesňou (tá istá pieseň má viac verzií)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Spoj <strong><span id="currentSongId"></span></strong> s:</p>
+        <div class="mb-3">
+          <input type="text" class="form-control" id="songSearch" placeholder="Search songs...">
+        </div>
+        <div class="list-group" id="songList" style="max-height: 300px; overflow-y: auto;">
+          <!-- Songs will be loaded here -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zruš</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .category-btn {
+    padding: 6px 12px;
+    border: 1px solid #ccc;
+    background-color: white;
+    cursor: pointer;
+    border-radius: 4px;
+    user-select: none;
+  }
+  .category-btn.selected {
+    background-color: #0d6efd;
+    color: white;
+    border-color: #0d6efd;
+  }
+  .alt-title-entry {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .alt-title-entry input {
+    flex-grow: 1;
+  }
+    .part-card {
+    border-left: 5px solid transparent;
+  }
+
+  .part-verse {
+    border-left-color:rgb(62, 94, 212); /* gray */
+    background-color:rgba(62, 94, 212, 0.53);
+  }
+
+  .part-chorus {
+    border-left-color:rgb(207, 34, 34); /* blue */
+    background-color: rgba(207, 34, 34, 0.24);
+    font-weight: bold;
+  }
+
+  .part-bridge {
+    border-left-color:rgb(32, 201, 151); /* teal */
+    background-color: rgba(32, 201, 151, .25);
+              font-style: italic;
+
+  }
+
+  .part-intro {
+    border-left-color:rgb(255, 193, 7); /* yellow */
+    background-color:rgba(255, 193, 7, .24);
+      font-weight: italic;
+  }
+
+  .part-outro {
+    border-left-color:rgb(253, 126, 20); /* orange */
+    background-color: rgba(253, 126, 20, .24);
+  }
+
+  .part-coda {
+    border-left-color:rgb(68, 193, 66); /* purple */
+    background-color: rgba(68, 193, 66, .24);
+          font-style: italic;
+  }
+
+  .part-interlude {
+    border-left-color:rgb(102, 16, 242); /* indigo */
+    background-color: rgba(102, 16, 242, .24); 
+  }
+
+  .part-pre-chorus {
+    border-left-color:rgb(214, 51, 132); /* pink */
+    background-color:rgba(214, 51, 132, .24);
+  }
+  .delete-part {
+  transition: all 0.2s;
+}
+
+.delete-part:hover {
+  transform: scale(1.05);
+}
+
+.part-card {
+  position: relative;
+  transition: all 0.3s;
+}
+
+.part-card:hover {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+.part-card {
+  position: relative;
+  transition: all 0.6s ease-in-out;
+  opacity: 1;
+  transform: scale(1);
+  overflow: hidden;
+  max-height: 1000px; /* Large initial value */
+}
+
+.part-card.deleting {
+  opacity: 0;
+  transform: scale(0.9);
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-width: 0;
+  transition: 
+    opacity 0.8s ease-in-out,
+    transform 0.8s ease-in-out,
+    max-height 0.6s ease-in-out 0.2s,
+    padding 0.5s ease-in-out 0.3s,
+    margin 0.5s ease-in-out 0.3s,
+    border-width 0.4s ease-in-out 0.3s;
+}
+</style>
+
+<script>
+   // Categories buttons logic (same as before)
+  const buttonsContainer = document.getElementById('categories-buttons');
+  const hiddenInput = document.getElementById('categories-input');
+
+  buttonsContainer.addEventListener('click', e => {
+    if (e.target.classList.contains('category-btn')) {
+      e.target.classList.toggle('selected');
+
+      const selected = Array.from(buttonsContainer.querySelectorAll('.category-btn.selected'))
+                            .map(btn => btn.getAttribute('data-value'));
+
+      hiddenInput.value = selected.join(';;');
+        console.log('Hidden input value:', hiddenInput.value); // <-- print hidden input string
+
+    }
+  });
+
+  // Alternative titles add/remove logic
+  const altTitlesList = document.getElementById('alt-titles-list');
+  const addAltTitleBtn = document.getElementById('add-alt-title');
+
+  addAltTitleBtn.addEventListener('click', () => {
+    const newEntry = document.createElement('div');
+    newEntry.classList.add('alt-title-entry');
+    newEntry.innerHTML = `
+      <input type="text" name="alternative_titles" class="form-control mb-2" placeholder="Enter alternative title" />
+      <button type="button" class="remove-alt-title btn btn-danger btn-sm">Remove</button>
+    `;
+    altTitlesList.appendChild(newEntry);
+  });
+
+  altTitlesList.addEventListener('click', e => {
+    if (e.target.classList.contains('remove-alt-title')) {
+      e.target.parentElement.remove();
+    }
+  });
+  
+   function confirmDelete(fileType, filePath = '') {
+    if (confirm("Are you sure you want to delete this file?")) {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = `/delete_file/{{ song.id }}/${fileType}`;
+      if (filePath) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'path';
+        input.value = filePath;
+        form.appendChild(input);
+      }
+      document.body.appendChild(form);
+      form.submit();
+    }
+  }
+ // Helper functions
+function replaceChords(text) {
+  return text.replace(/\[([^\]]+)\]/g, "<sup style='color:orange; font-size:1.2em'><strong>$1</strong></sup>");
+}
+
+function escapeHtml(unsafe) {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// Initialize part functionality
+function initializePartFunctionality(partCard) {
+  const select = partCard.querySelector('.part-type-select');
+  const textarea = partCard.querySelector('textarea[name^="part_lines_"]');
+  const previewBlock = partCard.querySelector('.rendered-block');
+  
+  // Part type change handler
+  select.addEventListener('change', () => {
+    const newType = select.value.toLowerCase().replace(/\s+/g, '-');
+    partCard.className = partCard.className
+      .split(' ')
+      .filter(cls => !cls.startsWith('part-') || cls === 'part-card')
+      .join(' ');
+    partCard.classList.add(`part-${newType}`);
+  });
+  
+  // Live preview
+  textarea.addEventListener('input', () => {
+    const lines = textarea.value.split('\n');
+    previewBlock.innerHTML = lines.map(line => {
+      return `<div>${replaceChords(escapeHtml(line))}</div>`;
+    }).join('');
+  });
+  
+  // Modify the delete part of your initializePartFunctionality
+// Improved delete functionality with animation
+const deleteBtn = partCard.querySelector('.delete-part');
+if (deleteBtn) {
+  deleteBtn.addEventListener('click', async function() {
+    if (confirm('Are you sure you want to delete this part?')) {
+      // Disable the button during animation
+      this.disabled = true;
+      
+      // Start the deletion animation
+      partCard.classList.add('deleting');
+      
+      // Wait for the animation to complete
+      await new Promise(resolve => {
+        partCard.addEventListener('transitionend', resolve, { once: true });
+      });
+      
+      // Remove the element
+      partCard.remove();
+      
+      // Optional: Reindex remaining parts
+      document.querySelectorAll('.part-card').forEach((card, index) => {
+        card.dataset.partIndex = index;
+        // Update name attributes of inputs if needed
+        card.querySelectorAll('[name^="part_type_"], [name^="part_lines_"]').forEach(input => {
+          input.name = input.name.replace(/_\d+/, `_${index}`);
+        });
+      });
+    }
+  });
+}
+  
+  // Trigger initial render
+  textarea.dispatchEvent(new Event('input'));
+}
+
+// Initialize all existing parts on page load
+document.querySelectorAll('.part-card').forEach(partCard => {
+  initializePartFunctionality(partCard);
+});
+
+// Add new part
+let partIndex = {{ data | length }};
+document.getElementById('add-part').addEventListener('click', () => {
+  const container = document.getElementById('parts-container');
+  const card = document.createElement('div');
+  card.className = 'card p-3 mb-3 part-card part-verse';
+  card.dataset.partIndex = partIndex;
+  card.innerHTML = `
+    <div class="d-flex justify-content-between align-items-start mb-2">
+      <div style="flex-grow: 1; margin-right: 10px;">
+        <label>Part Type</label>
+        <select class="form-select part-type-select" name="part_type_${partIndex}" data-part-index="${partIndex}">
+          {% for pt in part_types %}<option value="{{ pt }}">{{ pt }}</option>{% endfor %}
+        </select>
+      </div>
+      <button type="button" class="btn btn-danger btn-sm delete-part" style="margin-top: 24px;">
+        <i class="bi bi-trash"></i> Delete
+      </button>
+    </div>
+    <div class="mb-2">
+      <label>Lines (chords and lyrics)</label>
+      <textarea class="form-control" name="part_lines_${partIndex}" rows="5"></textarea>
+    </div>
+    <div class="text-muted">Preview:</div>
+    <div class="rendered-block bg-light p-2 border"></div>
+  `;
+  
+  container.insertBefore(card, document.getElementById('add-part'));
+  initializePartFunctionality(card);
+  partIndex++;
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+  const modal = new bootstrap.Modal(document.getElementById('associateSongModal'));
+  let currentSongContainer = null;
+
+  // Click handler for song IDs
+  document.querySelectorAll('.clickable-song-id').forEach(el => {
+    el.addEventListener('click', function(e) {
+      e.preventDefault();
+      currentSongContainer = this.closest('.song-container');
+      const songId = this.dataset.songId;
+      document.getElementById('currentSongId').textContent = songId;
+      const prefix = songId.split('-')[0];
+      
+      // Show loading state
+      const list = document.getElementById('songList');
+      list.innerHTML = `
+        <div class="text-center py-3">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      `;
+      
+      // Fetch songs
+      fetch(`/api/songs?prefix=${prefix}&exclude_id=${songId}`)
+        .then(response => response.json())
+        .then(songs => {
+          list.innerHTML = '';
+          
+          if (songs.length === 0) {
+            list.innerHTML = '<div class="text-center py-3">No songs found</div>';
+            return;
+          }
+          
+          // Add matching prefix songs first
+          songs.filter(s => s.song_id.startsWith(prefix))
+               .forEach(song => addSongItem(song, list, modal));
+          
+          // Add other songs
+          songs.filter(s => !s.song_id.startsWith(prefix))
+               .forEach(song => addSongItem(song, list, modal));
+        })
+        .catch(error => {
+          console.error("Error:", error);
+          list.innerHTML = `
+            <div class="alert alert-danger">
+              Error loading songs: ${error.message}
+            </div>
+          `;
+        });
+    });
+  });
+
+  // Search functionality
+  document.getElementById('songSearch').addEventListener('input', function() {
+    const term = this.value.toLowerCase();
+    document.querySelectorAll('#songList .song-item').forEach(item => {
+      const text = item.textContent.toLowerCase();
+      item.style.display = text.includes(term) ? 'block' : 'none';
+    });
+  });
+
+  // Helper function to create song items
+  function addSongItem(song, list, modal) {
+    const item = document.createElement('button');
+    item.className = 'list-group-item list-group-item-action song-item';
+    item.innerHTML = `
+      <div class="fw-bold">${song.song_id}</div>
+      <div>${song.title}</div>
+      ${song.version_name ? `<small class="text-muted">${song.version_name}</small>` : ''}
+    `;
+    
+    item.addEventListener('click', function() {
+      // Get all relevant elements
+      const currentIdElement = currentSongContainer.querySelector('.clickable-song-id');
+      const titleInput = currentSongContainer.querySelector('input[name="title"]');
+      const versionInput = currentSongContainer.querySelector('input[name="version_name"]');
+      const hiddenIdInput = currentSongContainer.querySelector('input[name="song_id"]');
+      
+      const currentTitle = titleInput.value;
+      
+      // 1. Update VISUAL display
+      currentIdElement.textContent = song.song_id;
+      currentIdElement.dataset.songId = song.song_id;
+      
+      // 2. Update HIDDEN form field (critical for submission)
+      if (!hiddenIdInput) {
+        console.log('not')
+        // Create hidden input if it doesn't exist
+        const newHiddenInput = document.createElement('input');
+        newHiddenInput.type = 'hidden';
+        newHiddenInput.name = 'associated_song_id';
+        newHiddenInput.value = song.song_id;
+        currentSongContainer.appendChild(newHiddenInput);
+      } else {
+                console.log('yes')
+
+        hiddenIdInput.value = song.song_id;
+      }
+      
+      // 3. Move current title to version if different
+      if (currentTitle && currentTitle !== song.title) {
+        versionInput.value = versionInput.value 
+          ? `${currentTitle}, ${versionInput.value}` 
+          : currentTitle;
+      }
+      
+      // 4. Update title
+      titleInput.value = song.title;
+      
+      modal.hide();
+    });
+    
+    list.appendChild(item);
+  }
+});
+</script>
+{% endblock %}
+
